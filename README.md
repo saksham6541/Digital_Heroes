@@ -6,8 +6,8 @@ Built for the Digital Heroes selection assignment (PRD Level 1, 2026 edition).
 
 | | |
 |---|---|
-| **Live site** | `<LIVE_URL>` |
-| **Repository** | `<GITHUB_REPO_URL>` |
+| **Live site** | `https://digital-heroes-git-main-saksham-kaushik.vercel.app` |
+| **Repository** | `https://github.com/saksham6541/Digital_Heroes` |
 
 ## Evaluation credentials
 
