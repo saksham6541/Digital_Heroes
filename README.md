@@ -6,8 +6,8 @@ Built for the Digital Heroes selection assignment (PRD Level 1, 2026 edition).
 
 | | |
 |---|---|
-| **Live site** | `<LIVE_URL>` |
-| **Repository** | `<GITHUB_REPO_URL>` |
+| **Live site** | `https://digital-heroes-git-main-saksham-kaushik.vercel.app` |
+| **Repository** | `https://github.com/saksham6541/Digital_Heroes` |
 
 ## Evaluation credentials
 
@@ -230,6 +230,10 @@ Not tested: a live payment gateway (none is connected), and load or concurrency 
 - Uploaded file type is checked by its declared MIME type, not by inspecting the file contents.
 - Draws are triggered by an admin, with an optional scheduled endpoint protected by a secret.
 - The middleware file uses a convention that Next.js 16 marks as deprecated (it still works).
+- The homepage's "recorded independent donations" total may not
+  perfectly reflect every row in the donations table in all cases —
+  a minor discrepancy was observed during testing and not fully
+  root-caused before submission.
 
 ## Scalability
 

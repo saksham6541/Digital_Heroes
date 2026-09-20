@@ -1,19 +1,21 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import NavBar from "@/components/NavBar";
 import { MotionFadeIn, MotionStaggerContainer, MotionStaggerItem, MotionCard } from "@/components/ui/MotionWrapper";
 
 export default async function HomePage() {
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, { data: charities }, { data: donations }] = await Promise.all([
     user ? supabase.from("profiles").select("role").eq("id", user.id).single() : Promise.resolve({ data: null }),
     supabase.from("charities").select("id, name, slug, description, image_url, is_featured").order("name"),
-    supabase.from("donations").select("amount"),
+    adminSupabase.from("donations").select("amount"),
   ]);
   const featuredCharity = (charities ?? []).find((charity) => charity.is_featured) ?? charities?.[0] ?? null;
   const donationTotal = (donations ?? []).reduce((total, donation) => total + Number(donation.amount ?? 0), 0);
+  console.log("Homepage donations query", { rows: donations, rowCount: donations?.length ?? 0, sum: donationTotal });
 
   return (
     <div className="min-h-screen overflow-x-hidden">
