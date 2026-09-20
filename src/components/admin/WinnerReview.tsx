@@ -85,6 +85,7 @@ export default function WinnerReview({ winners: initial }: { winners: WinnerReco
                     <a href={w.proof_url} target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">
                       View full size
                     </a>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={w.proof_url} alt="Winner proof" className="max-w-[120px] rounded border border-neutral-700" />
                   </div>
                 ) : (

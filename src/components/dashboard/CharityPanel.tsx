@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { PLANS } from "@/lib/plans";
 
 export interface CharityOption {
   id: string;
@@ -12,6 +13,8 @@ export interface UserCharityProfile {
   id: string;
   charity_id?: string | null;
   charity_contribution_pct?: number | null;
+  plan?: string | null;
+  subscription_plan?: string | null;
 }
 
 export default function CharityPanel({
@@ -25,6 +28,10 @@ export default function CharityPanel({
   const [pct, setPct] = useState(profile?.charity_contribution_pct ?? 10);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const currentPlan = ((profile?.subscription_plan ?? profile?.plan ?? "monthly") as string).toLowerCase();
+  const normalizedPlan: "monthly" | "yearly" = currentPlan === "yearly" ? "yearly" : "monthly";
+  const planPrice = PLANS[normalizedPlan].priceInr;
+  const charityAmount = planPrice * (pct / 100);
 
   async function save() {
     if (!profile) return;
@@ -42,6 +49,12 @@ export default function CharityPanel({
   return (
     <div className="rounded-2xl border border-neutral-900 bg-neutral-900/40 p-6">
       <h2 className="font-semibold text-lg mb-4">Your charity</h2>
+
+      <div className="mb-4 rounded-lg bg-neutral-950/60 px-3 py-2.5">
+        <p className="text-neutral-500 text-xs uppercase tracking-wide">Charity per period</p>
+        <p className="text-xl font-semibold text-emerald-400">₹{charityAmount.toLocaleString("en-IN")}</p>
+        <p className="text-xs text-neutral-400">{pct}% of {PLANS[normalizedPlan].label} plan</p>
+      </div>
 
       <label className="text-xs text-neutral-500 uppercase tracking-wide">Recipient</label>
       <select
