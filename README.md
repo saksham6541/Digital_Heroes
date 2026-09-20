@@ -13,11 +13,14 @@ Built for the Digital Heroes selection assignment (PRD Level 1, 2026 edition).
 
 These accounts are for evaluation only.
 
+## Reviewer credentials
+
 | Role | Email | Password |
 |---|---|---|
-| Subscriber | `<SUBSCRIBER_EMAIL>` | `<SUBSCRIBER_PASSWORD>` |
-| Administrator | `<ADMIN_EMAIL>` | `<ADMIN_PASSWORD>` |
+| Subscriber | reviewer.subscriber@digitalheroes-review.com | DHreview#Sub2026! |
+| Admin | reviewer.admin@digitalheroes-review.com | DHreview#Admin2026! |
 
+Live URL: https://digital-heroes-beta-rust.vercel.app
 Payments are a sandbox (see [Payments](#payments)), so no card is needed. A new account can subscribe from the dashboard in two clicks.
 
 ---
