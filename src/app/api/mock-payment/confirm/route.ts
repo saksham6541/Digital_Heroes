@@ -5,11 +5,15 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 function getPeriodEnd(plan: "monthly" | "yearly", now: Date) {
   const next = new Date(now);
   if (plan === "yearly") next.setFullYear(next.getFullYear() + 1);
-  else next.setDate(next.getDate() + 30);
+  else next.setMonth(next.getMonth() + 1);
   return next;
 }
 
 export async function POST(req: Request) {
+  if (process.env.MOCK_PAYMENTS !== "true") {
+    return NextResponse.json({ error: "Mock payments are disabled." }, { status: 404 });
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,6 +33,13 @@ export async function POST(req: Request) {
   }
 
   const adminSupabase = createAdminClient();
+  const { data: currentProfile, error: profileError } = await adminSupabase
+    .from("profiles")
+    .select("current_period_end")
+    .eq("id", user.id)
+    .single();
+  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+
   if (charityId) {
     const { data: charity, error: charityError } = await adminSupabase
       .from("charities")
@@ -40,7 +51,11 @@ export async function POST(req: Request) {
   }
 
   const subscription = await mockPayment.createSubscription({ plan, userId: user.id });
-  const nextEnd = getPeriodEnd(plan, new Date());
+  const now = new Date();
+  const existingEnd = currentProfile?.current_period_end ? new Date(currentProfile.current_period_end) : null;
+  // Renewals extend an unexpired subscription instead of shortening it.
+  const baseline = existingEnd && existingEnd.getTime() > now.getTime() ? existingEnd : now;
+  const nextEnd = getPeriodEnd(plan, baseline);
   const { error: updateError } = await adminSupabase
     .from("profiles")
     .update({

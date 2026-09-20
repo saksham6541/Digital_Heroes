@@ -10,7 +10,6 @@ const STATUS_STYLES: Record<string, string> = {
   inactive: "bg-neutral-700/40 text-neutral-300",
   lapsed: "bg-amber-500/15 text-amber-400",
   cancelling: "bg-amber-500/15 text-amber-300",
-  cancelled: "bg-red-500/15 text-red-300",
 };
 
 export interface SubscriptionProfile {
@@ -79,7 +78,7 @@ export default function SubscriptionPanel({ profile }: { profile: SubscriptionPr
   async function resumeSubscription() {
     setLoading("resume");
     setError(null);
-    const res = await fetch("/api/subscribe/resume", { method: "POST" });
+    const res = await fetch("/api/mock-payment/resume", { method: "POST" });
     const data = await res.json().catch(() => null);
     setLoading(null);
 
@@ -158,13 +157,6 @@ export default function SubscriptionPanel({ profile }: { profile: SubscriptionPr
       {status === "lapsed" && (
         <div className="space-y-2 text-sm text-neutral-300">
           <p>Your subscription ended on {formatDate(renewDate)}</p>
-          {renderPlanButtons()}
-        </div>
-      )}
-
-      {status === "cancelled" && (
-        <div className="space-y-4 text-sm text-neutral-300">
-          <p>Your subscription is cancelled. Start a new sandbox subscription when you&apos;re ready.</p>
           {renderPlanButtons()}
         </div>
       )}

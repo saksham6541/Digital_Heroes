@@ -1,4 +1,4 @@
-export type SubscriptionState = "inactive" | "active" | "cancelling" | "lapsed" | "cancelled";
+export type SubscriptionState = "inactive" | "active" | "cancelling" | "lapsed";
 
 export interface SubscriptionProfileLike {
   subscription_status?: string | null;
@@ -34,8 +34,6 @@ export function getSubscriptionState(
   const endValue = profile.current_period_end ?? profile.subscription_renews_at ?? null;
   const expiresAt = endValue ? new Date(endValue) : null;
   const isCancelPending = Boolean(profile.cancel_at_period_end);
-
-  if (status === "cancelled") return "cancelled";
 
   if (status === "active" && expiresAt && expiresAt.getTime() > now.getTime()) {
     return isCancelPending ? "cancelling" : "active";

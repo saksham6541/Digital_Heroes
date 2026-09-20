@@ -3,6 +3,10 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { mockPayment } from "@/lib/mock-payment";
 
 export async function POST(req: Request) {
+  if (process.env.MOCK_PAYMENTS !== "true") {
+    return NextResponse.json({ error: "Mock payments are disabled." }, { status: 404 });
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

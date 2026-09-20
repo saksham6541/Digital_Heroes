@@ -4,9 +4,11 @@
 
 ## Payment Provider
 
-Payments are simulated in this assignment. Razorpay requires PAN/KYC verification even for initial signup, which is not feasible within the assignment timeline, and Stripe is unavailable for Indian merchants in this setup. The app therefore uses an explicit Digital Heroes Sandbox Mode confirmation page and does not collect card details or claim that a real payment was processed.
+Payments are simulated in this assignment. Razorpay requires PAN/KYC verification even for initial signup, which is not feasible within the assignment timeline, and Stripe is unavailable for Indian merchants in this setup. The app uses an explicit Digital Heroes Sandbox Mode confirmation page and does not collect card details.
 
-The mock provider is intentionally provider-swappable. Checkout, confirmation, and webhook-style state transition logic are isolated behind the payment routes and `src/lib/mock-payment.ts`; a real Stripe or Razorpay integration would replace those provider routes without changing the subscription data model. The existing `subscription_status` lifecycle (`active`, `inactive`, `lapsed`, and `cancelled`) remains the source of truth for access and UI state.
+The final sandbox routes are `/api/mock-payment/checkout`, `/api/mock-payment/confirm`, `/api/mock-payment/cancel`, and `/api/mock-payment/resume`, with the confirmation page at `/checkout/confirm`. Subscription state and access rules are centralized in `src/lib/subscription.ts`; cancellation sets `cancel_at_period_end` and keeps access through the current period end, after which the derived state becomes `lapsed`.
+
+The mock provider is intentionally provider-swappable. A real gateway would replace these checkout, confirmation, and webhook-style transition routes without changing the subscription data model. The deleted Stripe implementation is recoverable from git history in commit `7ea76d9`, but it was not tested against a live account. Sandbox mode grants free subscriptions and must never be enabled in production.
 -- Run this in the Supabase SQL editor AFTER schema.sql.
 -- Adds: charity contribution floor, winner proof transition guard,
 -- admin-only billing/payout field guard.

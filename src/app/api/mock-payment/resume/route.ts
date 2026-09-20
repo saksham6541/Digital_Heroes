@@ -18,26 +18,24 @@ export async function POST() {
     .select("subscription_status, current_period_end, cancel_at_period_end")
     .eq("id", user.id)
     .single();
+  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
 
-  if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
-  }
-
-  const currentEnd = profile?.current_period_end ? new Date(profile.current_period_end) : null;
-  const isCancelling = profile?.cancel_at_period_end === true && profile?.subscription_status === "active" && currentEnd && currentEnd.getTime() > Date.now();
-
+  const currentEnd = profile.current_period_end ? new Date(profile.current_period_end) : null;
+  const isCancelling =
+    profile.subscription_status === "active" &&
+    profile.cancel_at_period_end === true &&
+    currentEnd !== null &&
+    currentEnd.getTime() > Date.now();
   if (!isCancelling) {
     return NextResponse.json({ error: "Subscription is not in a cancelling state." }, { status: 409 });
   }
 
-  const { error: updateError } = await adminSupabase
+  // Resuming only clears the scheduled cancellation; it does not alter billing dates.
+  const { error } = await adminSupabase
     .from("profiles")
     .update({ cancel_at_period_end: false })
     .eq("id", user.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, cancel_at_period_end: false });
 }
