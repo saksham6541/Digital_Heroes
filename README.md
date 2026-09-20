@@ -1,103 +1,128 @@
-# Digital Heroes — Level 1 Selection Assignment
+-- ============================================================================
+-- Digital Heroes — Database Guards Migration
+-- ============================================================================
 
-A subscription-driven platform combining golf performance tracking, a monthly
-draw-based prize engine, and charity fundraising. Built against the PRD
-(`Digital_Heroes_PRD__Level_1_.pdf`) within the 2-day window.
+## Payment Provider
 
-**Stack:** Next.js 15 (App Router, TypeScript) · Supabase (Postgres, Auth,
-Storage) · Stripe (subscriptions, test mode) · Tailwind CSS
+Payments are simulated in this assignment. Razorpay requires PAN/KYC verification even for initial signup, which is not feasible within the assignment timeline, and Stripe is unavailable for Indian merchants in this setup. The app therefore uses an explicit Digital Heroes Sandbox Mode confirmation page and does not collect card details or claim that a real payment was processed.
 
----
-
-## 1. What's implemented
-
-| Area | Status |
-|---|---|
-| Auth (signup/login, session middleware) | ✅ |
-| Subscription (Stripe Checkout, monthly/yearly, webhook sync) | ✅ |
-| Score management (1–45 range, 1/date, rolling window of 5, reverse-chron) | ✅ |
-| Charity directory with search/filter & independent donations | ✅ |
-| Charity selection at signup + adjustable % (min 10%) | ✅ |
-| User dashboard (all 5 required modules, §10) | ✅ |
-| Winner proof direct screenshot upload UI (Supabase Storage) | ✅ |
-| Draw engine — random **and** algorithmic (weighted) modes | ✅ |
-| Prize pool auto-calc (40/35/25 split) + jackpot rollover | ✅ |
-| Admin: users (inline role & subscription edits), draws, charities, winners | ✅ |
-| Admin Reports & Analytics with interactive Recharts | ✅ |
-| Automated monthly cadence (Vercel Cron) | ✅ |
-| Motion & micro-interactions (Framer Motion) | ✅ |
-| RLS policies on every table | ✅ |
+The mock provider is intentionally provider-swappable. Checkout, confirmation, and webhook-style state transition logic are isolated behind the payment routes and `src/lib/mock-payment.ts`; a real Stripe or Razorpay integration would replace those provider routes without changing the subscription data model. The existing `subscription_status` lifecycle (`active`, `inactive`, `lapsed`, and `cancelled`) remains the source of truth for access and UI state.
+-- Run this in the Supabase SQL editor AFTER schema.sql.
+-- Adds: charity contribution floor, winner proof transition guard,
+-- admin-only billing/payout field guard.
 
 ---
 
-## 2. Setup
+-- 1. Charity contribution floor (minimum 10%)
 
-### 2.1 Supabase
-1. Create a **new** Supabase project.
-2. SQL Editor → paste and run `supabase/schema.sql` in full. This creates all
-   tables, RLS policies, the `handle_new_user` trigger, and 3 seed charities.
-3. Storage → create a public bucket named `winner-proofs` (used for the
-   winner-verification screenshot upload).
-4. Project Settings → API → copy the URL, `anon` key, and `service_role` key.
+---
 
-### 2.2 Stripe
-1. Use a **test-mode** Stripe account.
-2. Create two recurring Prices (e.g. "Digital Heroes Monthly" / "Yearly").
-3. Developers → Webhooks → add an endpoint at `<your-domain>/api/stripe/webhook`
-   listening for: `checkout.session.completed`, `customer.subscription.deleted`,
-   `invoice.paid`, `invoice.payment_failed`. Copy the signing secret.
+ALTER TABLE public.profiles
+DROP CONSTRAINT IF EXISTS profiles_charity_contribution_pct_check;
 
-### 2.3 Environment variables
-Copy `.env.example` to `.env.local` and fill in the Supabase + Stripe values.
+ALTER TABLE public.profiles
+ADD CONSTRAINT profiles_charity_contribution_pct_check
+CHECK (charity_contribution_pct >= 10.00 AND charity_contribution_pct <= 100.00);
 
-### 2.4 Run locally
-```bash
-npm install
-npm run dev
-```
+---
 
-### 2.5 Deploy
-- Push to a GitHub repo, import into a **new** Vercel account, add the same
-  env vars there, redeploy.
-- To make yourself an admin: sign up normally, then in the Supabase table
-  editor set that row's `profiles.role` to `admin`.
+-- 2. Winner proof transition guard
+-- Only allows: awaiting_proof/rejected -> submitted -> approved/rejected
+-- This also enables "resubmit after rejection".
 
-## 3. Assumptions & interpretation notes
+---
 
-The PRD is intentionally ambiguous in places (§17: "ambiguity is part of the
-test"). Documented decisions:
+CREATE OR REPLACE FUNCTION public.winners_proof_resubmission_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+IF (
+OLD.review_status IN ('awaiting_proof', 'rejected')
+AND NEW.review_status = 'submitted'
+AND NEW.proof_url IS NOT NULL
+) THEN
+RETURN NEW;
+END IF;
 
-- **Draw numbers**: derived from each subscriber's last 5 Stableford scores
-  (`numbersFromScores` in `src/lib/draw-engine.ts`), connecting performance tracking directly to prize entry.
-- **Algorithmic mode**: frequency-weighted random draw across all entrants' numbers with +1 Laplace smoothing.
-- **Prize pool contribution**: `PER_SUBSCRIBER_CONTRIBUTION` in `draw-engine.ts` (₹50 per subscriber).
-- **Jackpot rollover**: unclaimed 5-match pool rolls forward into the next published draw's 5-match tier.
-- **Currency**: INR (₹), aligned with the platform design.
-- **Winner proof upload**: direct file upload modal submitting screenshots to the Supabase `winner-proofs` bucket.
-- **Independent donations**: direct donation flow writing to `donations` table, not tied to gameplay.
-- **Monthly Cadence**: wired through `vercel.json` and `/api/draws/cron` for scheduled automated draws.
+IF (
+OLD.review_status = 'submitted'
+AND NEW.review_status IN ('approved', 'rejected')
+) THEN
+RETURN NEW;
+END IF;
 
-## 4. Project structure
+RAISE EXCEPTION 'Invalid winner proof transition';
+END;
 
-```
-src/
-  app/
-    (auth)/login, signup
-    dashboard/                — user dashboard
-    admin/                    — admin: users, draws, charities, winners
-    charities/                — public directory + detail pages
-    api/
-      scores/                 — score CRUD (rolling window enforced here)
-      draws/run/               — simulate/publish draw engine
-      winners/[id]/verify      — admin approve/reject/mark-paid
-      winners/[id]/proof       — winner proof submission
-      stripe/checkout, webhook
-  lib/
-    supabase/client.ts, server.ts   — browser/server/admin Supabase clients
-    draw-engine.ts                  — pure functions: pool math, draw, matching
-    stripe.ts
-  components/
-    dashboard/ — SubscriptionPanel, CharityPanel, ScorePanel, ParticipationPanel, WinningsPanel
-    admin/     — DrawRunner, CharityEditor, WinnerReview
-supabase/schema.sql — full schema + RLS + seed data
-```
+$$
+;
+
+DROP TRIGGER IF EXISTS winners_proof_transition_guard ON public.winners;
+
+CREATE TRIGGER winners_proof_transition_guard
+BEFORE UPDATE ON public.winners
+FOR EACH ROW
+WHEN (
+  OLD.review_status IS DISTINCT FROM NEW.review_status
+  OR OLD.proof_url IS DISTINCT FROM NEW.proof_url
+)
+EXECUTE FUNCTION public.winners_proof_resubmission_guard();
+
+-- ----------------------------------------------------------------------------
+-- 3. Admin-only guard for billing / payout fields
+--    Only enforced when auth.uid() is present (i.e. an authenticated app
+--    request). The Stripe webhook writes via the service-role client with
+--    no auth.uid(), so it is correctly unaffected by this guard.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_guard_billing_and_payout_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS
+$$
+
+BEGIN
+IF auth.uid() IS NOT NULL THEN
+IF (
+TG_TABLE_NAME = 'profiles'
+AND (
+NEW.subscription_status IS DISTINCT FROM OLD.subscription_status
+OR NEW.subscription_plan IS DISTINCT FROM OLD.subscription_plan
+OR NEW.subscription_renews_at IS DISTINCT FROM OLD.subscription_renews_at
+OR NEW.stripe_customer_id IS DISTINCT FROM OLD.stripe_customer_id
+OR NEW.stripe_subscription_id IS DISTINCT FROM OLD.stripe_subscription_id
+)
+) OR (
+TG_TABLE_NAME = 'winners'
+AND (
+NEW.payment_status IS DISTINCT FROM OLD.payment_status
+OR NEW.paid_at IS DISTINCT FROM OLD.paid_at
+OR NEW.amount IS DISTINCT FROM OLD.amount
+)
+) THEN
+IF NOT public.is_admin() THEN
+RAISE EXCEPTION 'Only admins may update billing and payout fields';
+END IF;
+END IF;
+END IF;
+
+RETURN NEW;
+END;
+
+$$
+;
+
+DROP TRIGGER IF EXISTS profiles_admin_billing_guard ON public.profiles;
+CREATE TRIGGER profiles_admin_billing_guard
+BEFORE UPDATE ON public.profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.admin_guard_billing_and_payout_fields();
+
+DROP TRIGGER IF EXISTS winners_admin_payout_guard ON public.winners;
+CREATE TRIGGER winners_admin_payout_guard
+BEFORE UPDATE ON public.winners
+FOR EACH ROW
+EXECUTE FUNCTION public.admin_guard_billing_and_payout_fields();
+$$

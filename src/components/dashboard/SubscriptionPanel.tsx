@@ -10,6 +10,7 @@ const STATUS_STYLES: Record<string, string> = {
   inactive: "bg-neutral-700/40 text-neutral-300",
   lapsed: "bg-amber-500/15 text-amber-400",
   cancelling: "bg-amber-500/15 text-amber-300",
+  cancelled: "bg-red-500/15 text-red-300",
 };
 
 export interface SubscriptionProfile {
@@ -43,14 +44,7 @@ export default function SubscriptionPanel({ profile }: { profile: SubscriptionPr
     setLoading(plan);
     setError(null);
 
-    const isMock = process.env.NEXT_PUBLIC_MOCK_PAYMENTS === "true";
-    if (isMock) {
-      router.push(`/checkout/mock?plan=${plan}`);
-      setLoading(null);
-      return;
-    }
-
-    const res = await fetch("/api/stripe/checkout", {
+    const res = await fetch("/api/mock-payment/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ plan, charityId: profile?.charity_id, contributionPct: profile?.charity_contribution_pct }),
@@ -70,7 +64,7 @@ export default function SubscriptionPanel({ profile }: { profile: SubscriptionPr
   async function cancelSubscription() {
     setLoading("cancel");
     setError(null);
-    const res = await fetch("/api/subscribe/cancel", { method: "POST" });
+    const res = await fetch("/api/mock-payment/cancel", { method: "POST" });
     const data = await res.json().catch(() => null);
     setLoading(null);
 
@@ -98,6 +92,27 @@ export default function SubscriptionPanel({ profile }: { profile: SubscriptionPr
   }
 
   const yearlySavings = PLANS.monthly.priceInr * 12 - PLANS.yearly.priceInr;
+
+  function renderPlanButtons() {
+    return (
+      <div className="flex gap-3">
+        <button
+          onClick={() => subscribe("monthly")}
+          disabled={loading !== null}
+          className="flex-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-semibold py-2 text-sm disabled:opacity-60"
+        >
+          {loading === "monthly" ? "Processing…" : "Monthly"}
+        </button>
+        <button
+          onClick={() => subscribe("yearly")}
+          disabled={loading !== null}
+          className="flex-1 rounded-lg border border-neutral-700 hover:border-emerald-500 font-semibold py-2 text-sm disabled:opacity-60"
+        >
+          {loading === "yearly" ? "Processing…" : "Yearly"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div id="subscription-panel" className="rounded-2xl border border-neutral-900 bg-neutral-900/40 p-6">
@@ -143,43 +158,20 @@ export default function SubscriptionPanel({ profile }: { profile: SubscriptionPr
       {status === "lapsed" && (
         <div className="space-y-2 text-sm text-neutral-300">
           <p>Your subscription ended on {formatDate(renewDate)}</p>
-          <div className="flex gap-3 mt-2">
-            <button
-              onClick={() => subscribe("monthly")}
-              disabled={loading !== null}
-              className="flex-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-semibold py-2 text-sm disabled:opacity-60"
-            >
-              {loading === "monthly" ? "..." : "Monthly"}
-            </button>
-            <button
-              onClick={() => subscribe("yearly")}
-              disabled={loading !== null}
-              className="flex-1 rounded-lg border border-neutral-700 hover:border-emerald-500 font-semibold py-2 text-sm disabled:opacity-60"
-            >
-              {loading === "yearly" ? "..." : "Yearly"}
-            </button>
-          </div>
+          {renderPlanButtons()}
+        </div>
+      )}
+
+      {status === "cancelled" && (
+        <div className="space-y-4 text-sm text-neutral-300">
+          <p>Your subscription is cancelled. Start a new sandbox subscription when you&apos;re ready.</p>
+          {renderPlanButtons()}
         </div>
       )}
 
       {status === "inactive" && (
         <div className="space-y-4">
-          <div className="flex gap-3">
-            <button
-              onClick={() => subscribe("monthly")}
-              disabled={loading !== null}
-              className="flex-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-semibold py-2 text-sm disabled:opacity-60"
-            >
-              {loading === "monthly" ? "Processing…" : "Monthly"}
-            </button>
-            <button
-              onClick={() => subscribe("yearly")}
-              disabled={loading !== null}
-              className="flex-1 rounded-lg border border-neutral-700 hover:border-emerald-500 font-semibold py-2 text-sm disabled:opacity-60"
-            >
-              {loading === "yearly" ? "Processing…" : "Yearly"}
-            </button>
-          </div>
+          {renderPlanButtons()}
           <p className="text-xs text-neutral-400">Yearly saves ₹{yearlySavings} compared with paying monthly.</p>
         </div>
       )}

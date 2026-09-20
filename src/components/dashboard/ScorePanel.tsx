@@ -4,6 +4,11 @@ import { useState } from "react";
 
 type Score = { id: string; score: number; played_on: string };
 
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 export default function ScorePanel({ initialScores, isSubscriptionActive }: { initialScores: Score[]; isSubscriptionActive: boolean }) {
   const [scores, setScores] = useState<Score[]>(initialScores);
   const [score, setScore] = useState("");
@@ -147,7 +152,7 @@ export default function ScorePanel({ initialScores, isSubscriptionActive }: { in
                 </>
               ) : (
                 <>
-                  <span className="text-neutral-400">{new Date(s.played_on).toLocaleDateString()}</span>
+                  <span className="text-neutral-400">{formatDate(s.played_on)}</span>
                   <span className="font-semibold">{s.score}</span>
                   <div className="flex gap-2">
                     <button

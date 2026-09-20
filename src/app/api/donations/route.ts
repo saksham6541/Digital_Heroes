@@ -16,11 +16,11 @@ export async function POST(req: Request) {
     !charity_id ||
     typeof amount !== "number" ||
     !Number.isFinite(amount) ||
-    amount < 1 ||
+    amount <= 0 ||
     amount > 100000
   ) {
     return NextResponse.json(
-      { error: "A valid charity and donation amount between 1 and 100,000 are required." },
+      { error: "A valid charity and donation amount greater than 0 and up to 100,000 are required." },
       { status: 400 }
     );
   }
@@ -47,7 +47,6 @@ export async function POST(req: Request) {
       charity_id,
       user_id: user?.id || null,
       amount: roundedAmount,
-      stripe_payment_intent_id: `pi_test_${Date.now()}`,
     })
     .select()
     .single();
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     success: true,
-    message: `Thank you! Your donation of ₹${roundedAmount.toLocaleString("en-IN")} to ${charity.name} has been processed.`,
+    message: `Thank you! Your donation of ₹${roundedAmount.toLocaleString("en-IN")} to ${charity.name} has been recorded.`,
     donation,
   });
 }
