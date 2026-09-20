@@ -1,17 +1,21 @@
-import { createClient } from "@/lib/supabase/server";
+import { getAdminContext } from "@/lib/admin-auth";
 import NavBar from "@/components/NavBar";
 import UserManagementTable from "@/components/admin/UserManagementTable";
 import { EditableUser } from "@/components/admin/UserEditModal";
 
 export default async function AdminUsersPage() {
-  const supabase = await createClient();
-  const [{ data: users }, { data: charities }] = await Promise.all([
-    supabase
+  const context = await getAdminContext();
+  if (context.error) return <main className="p-8">Admin access required.</main>;
+  const [{ data: users }, { data: charities }, { data: authUsers }] = await Promise.all([
+    context.adminClient
       .from("profiles")
-      .select("id, full_name, role, subscription_status, subscription_plan, charity_id, charity_contribution_pct, charities(name)")
+      .select("id, full_name, role, subscription_status, plan, subscription_plan, current_period_end, subscription_renews_at, cancel_at_period_end, charity_id, charity_contribution_pct, charities(name)")
       .order("created_at", { ascending: false }),
-    supabase.from("charities").select("id, name").order("name"),
+    context.adminClient.from("charities").select("id, name").order("name"),
+    context.adminClient.auth.admin.listUsers({ perPage: 1000 }),
   ]);
+  const emailById = new Map((authUsers?.users ?? []).map((user) => [user.id, user.email ?? ""]));
+  const usersWithEmail = (users ?? []).map((user) => ({ ...user, email: emailById.get(user.id) ?? "" }));
 
   return (
     <div className="min-h-screen">
@@ -25,12 +29,12 @@ export default async function AdminUsersPage() {
             </p>
           </div>
           <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-            {(users ?? []).length} registered users
+            {usersWithEmail.length} registered users
           </span>
         </div>
 
         <UserManagementTable
-          initialUsers={(users as unknown as EditableUser[]) ?? []}
+          initialUsers={usersWithEmail as unknown as EditableUser[]}
           charities={charities ?? []}
         />
       </div>

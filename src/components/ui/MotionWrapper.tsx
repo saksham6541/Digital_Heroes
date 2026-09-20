@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
 import { ReactNode } from "react";
 
 interface MotionFadeInProps extends HTMLMotionProps<"div"> {
@@ -16,11 +16,12 @@ export function MotionFadeIn({
   className,
   ...props
 }: MotionFadeInProps) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+      transition={reduceMotion ? { duration: 0 } : { duration, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
       className={className}
       {...props}
     >
@@ -41,9 +42,10 @@ export function MotionStaggerContainer({
   delayChildren?: number;
   staggerChildren?: number;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      initial="hidden"
+      initial={reduceMotion ? false : "hidden"}
       animate="visible"
       variants={{
         hidden: { opacity: 0 },
@@ -70,6 +72,7 @@ export function MotionStaggerItem({
   children: ReactNode;
   className?: string;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
       variants={{
@@ -80,7 +83,7 @@ export function MotionStaggerItem({
           transition: { duration: 0.45, ease: "easeOut" },
         },
       }}
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      whileHover={reduceMotion ? undefined : { y: -4, transition: { duration: 0.2 } }}
       className={className}
     >
       {children}
@@ -95,9 +98,10 @@ export function MotionCard({
   children: ReactNode;
   className?: string;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      whileHover={{ scale: 1.015, transition: { duration: 0.2 } }}
+      whileHover={reduceMotion ? undefined : { scale: 1.015, transition: { duration: 0.2 } }}
       className={className}
     >
       {children}

@@ -24,22 +24,34 @@ export default function DrawRunner() {
   const [mode, setMode] = useState<"random" | "algorithmic">("random");
   const [result, setResult] = useState<DrawRunResult | null>(null);
   const [loading, setLoading] = useState<"simulate" | "publish" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function run(action: "simulate" | "publish") {
     setLoading(action);
+    setError(null);
+    if (action === "publish" && !window.confirm(`Publish the ${period} draw now?`)) {
+      setLoading(null);
+      return;
+    }
     const res = await fetch("/api/draws/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ period, mode, action }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
     setLoading(null);
+    if (!res.ok) {
+      setError(data?.error || "The draw action failed.");
+      setResult(null);
+      return;
+    }
     setResult(data);
   }
 
   return (
     <div className="rounded-2xl border border-neutral-900 bg-neutral-900/40 p-6">
       <h2 className="font-semibold text-lg mb-4">Configure & run a draw</h2>
+      {error && <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
 
       <div className="flex gap-3 mb-4">
         <div>

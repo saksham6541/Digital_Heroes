@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSubscriptionActive } from "@/lib/subscription";
+import { validateScoreInput } from "@/lib/score-validation";
 
 // POST /api/scores — add a new score entry.
 // Enforces: range 1-45, one entry per date, rolling window of 5.
@@ -30,12 +31,8 @@ export async function POST(req: Request) {
 
   const { score, playedOn } = payload;
 
-  if (typeof score !== "number" || score < 1 || score > 45) {
-    return NextResponse.json({ error: "Score must be between 1 and 45." }, { status: 400 });
-  }
-  if (!playedOn) {
-    return NextResponse.json({ error: "A date is required." }, { status: 400 });
-  }
+  const validationError = validateScoreInput(score, playedOn);
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
   const { data: existing, error: existingErr } = await supabase
     .from("scores")

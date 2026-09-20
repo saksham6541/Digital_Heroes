@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminContext } from "@/lib/admin-auth";
 import {
   calculatePoolShares,
   drawRandomNumbers,
@@ -17,18 +17,20 @@ const PER_SUBSCRIBER_CONTRIBUTION = 50; // ₹ fixed portion of a subscription f
 // Admin-only. "simulate" computes numbers + winners without persisting a
 // published result; "publish" commits it and creates winner records.
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const context = await getAdminContext();
+  if (context.error) return context.error;
+  const supabase = context.adminClient;
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
-  const { period, mode, action } = await req.json();
+  const { period, mode, action } = await req.json().catch(() => ({}));
   if (!period || !["random", "algorithmic"].includes(mode) || !["simulate", "publish"].includes(action)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  if (action === "publish") {
+    const { data: existing } = await supabase.from("draws").select("id, status").eq("period", period).maybeSingle();
+    if (existing?.status === "published") {
+      return NextResponse.json({ error: `Draw for ${period} is already published.` }, { status: 409 });
+    }
   }
 
   // Build entries: every active subscriber's numbers, derived from their last 5 scores.

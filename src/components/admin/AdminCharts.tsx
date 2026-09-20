@@ -66,25 +66,8 @@ export default function AdminCharts({
     );
   }
 
-  // Fallback demo data if no published draws yet
-  const displayDrawData =
-    drawStats.length > 0
-      ? drawStats
-      : [
-          { period: "2026-06", pool_total: 25000, pool_5: 10000, pool_4: 8750, pool_3: 6250, subscribers: 500 },
-          { period: "2026-07", pool_total: 35000, pool_5: 14000, pool_4: 12250, pool_3: 8750, subscribers: 700 },
-          { period: "2026-08", pool_total: 48000, pool_5: 19200, pool_4: 16800, pool_3: 12000, subscribers: 960 },
-          { period: "2026-09", pool_total: 62000, pool_5: 24800, pool_4: 21700, pool_3: 15500, subscribers: 1240 },
-        ];
-
-  const displayCharityData =
-    charityStats.length > 0
-      ? charityStats
-      : [
-          { name: "Bright Futures Foundation", amount: 18500 },
-          { name: "Clean Rivers Initiative", amount: 14200 },
-          { name: "Care for Strays", amount: 9800 },
-        ];
+  const displayDrawData = drawStats;
+  const displayCharityData = charityStats;
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 my-8">
@@ -100,7 +83,7 @@ export default function AdminCharts({
           </span>
         </div>
 
-        <div className="h-64 w-full">
+        {displayDrawData.length === 0 ? <p className="py-24 text-center text-sm text-neutral-500">No published draws yet.</p> : <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={displayDrawData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <XAxis dataKey="period" stroke="#737373" fontSize={11} />
@@ -123,7 +106,7 @@ export default function AdminCharts({
               <Bar dataKey="pool_3" name="3-Match (25%)" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
       </div>
 
       {/* Charity & Subscriber Distribution */}
@@ -139,7 +122,7 @@ export default function AdminCharts({
             </span>
           </div>
 
-          <div className="h-52 w-full">
+          {displayCharityData.length === 0 ? <p className="py-20 text-center text-sm text-neutral-500">No charity contributions yet.</p> : <div className="h-52 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -169,7 +152,7 @@ export default function AdminCharts({
                 />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </div>}
         </div>
 
         {/* Legend pills */}

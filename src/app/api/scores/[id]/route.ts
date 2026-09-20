@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSubscriptionActive } from "@/lib/subscription";
+import { validateScoreInput } from "@/lib/score-validation";
 
 // PATCH /api/scores/:id — edit a score entry (value and/or date)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,15 +30,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const { score, playedOn } = payload;
-  if (score !== undefined && (score < 1 || score > 45)) {
-    return NextResponse.json({ error: "Score must be between 1 and 45." }, { status: 400 });
+  if (score === undefined || playedOn === undefined) {
+    return NextResponse.json({ error: "Score and date are required." }, { status: 400 });
   }
+  const validationError = validateScoreInput(score, playedOn);
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
   if (score !== undefined) updates.score = score;
   if (playedOn !== undefined) updates.played_on = playedOn;
 
-  if (playedOn) {
+  {
     const { data: existing, error: existingErr } = await supabase
       .from("scores")
       .select("id")

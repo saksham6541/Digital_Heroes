@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface EditableUser {
   id: string;
+  email?: string;
   full_name: string | null;
   role: string;
   subscription_status: string;
   subscription_plan: string | null;
+  plan?: string | null;
+  current_period_end?: string | null;
+  subscription_renews_at?: string | null;
+  cancel_at_period_end?: boolean | null;
   charity_id: string | null;
   charity_contribution_pct?: number;
   charities?: { name: string } | null;
@@ -18,6 +23,12 @@ interface UserEditModalProps {
   charities: Array<{ id: string; name: string }>;
   onClose: () => void;
   onSaved: (updated: EditableUser) => void;
+}
+
+interface UserScore {
+  id: string;
+  score: number;
+  played_on: string;
 }
 
 export default function UserEditModal({
@@ -36,9 +47,37 @@ export default function UserEditModal({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scores, setScores] = useState<UserScore[]>([]);
+  const [scoreValue, setScoreValue] = useState("");
+  const [scoreDate, setScoreDate] = useState("");
+  const [scoresLoading, setScoresLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/admin/users/${user.id}/scores`)
+      .then((response) => response.json().catch(() => null).then((data) => ({ response, data })))
+      .then(({ response, data }) => {
+        if (active) {
+          if (response.ok) setScores(data?.scores ?? []);
+          else setError(data?.error || "Scores could not be loaded.");
+          setScoresLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError("Scores could not be loaded.");
+          setScoresLoading(false);
+        }
+      });
+    return () => { active = false; };
+  }, [user.id]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (!Number.isFinite(contributionPct) || contributionPct < 10 || contributionPct > 100) {
+      setError("Contribution must be between 10 and 100 percent.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -56,7 +95,7 @@ export default function UserEditModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(data.error || "Failed to update user");
       }
@@ -78,6 +117,43 @@ export default function UserEditModal({
     } finally {
       setLoading(false);
     }
+  }
+
+  async function addScore() {
+    setError(null);
+    const response = await fetch(`/api/admin/users/${user.id}/scores`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score: Number(scoreValue), playedOn: scoreDate }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) { setError(data?.error || "Score could not be added."); return; }
+    setScoreValue("");
+    setScoreDate("");
+    const refreshed = await fetch(`/api/admin/users/${user.id}/scores`);
+    const refreshedData = await refreshed.json().catch(() => null);
+    if (refreshed.ok) setScores(refreshedData?.scores ?? []);
+  }
+
+  async function deleteScore(scoreId: string) {
+    const response = await fetch(`/api/admin/users/${user.id}/scores/${scoreId}`, { method: "DELETE" });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) { setError(data?.error || "Score could not be deleted."); return; }
+    setScores((current) => current.filter((score) => score.id !== scoreId));
+  }
+
+  async function editScore(score: UserScore) {
+    const nextScore = window.prompt("Score (1-45)", String(score.score));
+    const nextDate = window.prompt("Date (YYYY-MM-DD)", score.played_on);
+    if (nextScore === null || nextDate === null) return;
+    const response = await fetch(`/api/admin/users/${user.id}/scores/${score.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score: Number(nextScore), playedOn: nextDate }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) { setError(data?.error || "Score could not be updated."); return; }
+    setScores((current) => current.map((item) => item.id === score.id ? { ...item, score: Number(nextScore), played_on: nextDate } : item));
   }
 
   return (
@@ -108,6 +184,16 @@ export default function UserEditModal({
               onChange={(e) => setFullName(e.target.value)}
               className="mt-1 w-full rounded-lg bg-neutral-950 border border-neutral-800 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
             />
+          </div>
+
+          <div className="border-t border-neutral-800 pt-4">
+            <h3 className="mb-2 text-sm font-semibold text-white">Golf scores</h3>
+            <div className="mb-3 grid grid-cols-[5rem_1fr_auto] gap-2">
+              <input type="number" min="1" max="45" placeholder="Score" value={scoreValue} onChange={(e) => setScoreValue(e.target.value)} className="rounded-lg bg-neutral-950 border border-neutral-800 px-2 py-2 text-sm" />
+              <input type="date" value={scoreDate} onChange={(e) => setScoreDate(e.target.value)} className="rounded-lg bg-neutral-950 border border-neutral-800 px-2 py-2 text-sm" />
+              <button type="button" onClick={addScore} className="rounded-lg border border-neutral-700 px-3 text-xs text-neutral-200">Add</button>
+            </div>
+            {scoresLoading ? <p className="text-xs text-neutral-500">Loading scores…</p> : scores.length === 0 ? <p className="text-xs text-neutral-500">No scores yet.</p> : <div className="space-y-2">{scores.map((score) => <div key={score.id} className="flex items-center justify-between rounded-lg bg-neutral-950 px-3 py-2 text-xs"><span>{score.played_on} · {score.score}</span><span className="space-x-2"><button type="button" onClick={() => editScore(score)} className="text-neutral-300">Edit</button><button type="button" onClick={() => deleteScore(score.id)} className="text-red-400">Delete</button></span></div>)}</div>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

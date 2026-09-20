@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { getAdminContext } from "@/lib/admin-auth";
 
 // PATCH /api/admin/users/[id]
 // Admin-only: update user profile, role, subscription override, and scores
@@ -8,26 +8,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: targetUserId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: callerProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (callerProfile?.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-  }
-
-  const adminClient = createAdminClient();
+  const context = await getAdminContext();
+  if (context.error) return context.error;
+  const { adminClient } = context;
   const body = await req.json();
   const {
     role,
@@ -53,6 +36,20 @@ export async function PATCH(
   }
   if (subscription_plan !== undefined) {
     profileUpdates.subscription_plan = subscription_plan;
+  }
+  if (subscription_status !== undefined || subscription_plan !== undefined) {
+    const nextStatus = subscription_status ?? "inactive";
+    const nextPlan = subscription_plan === "yearly" ? "yearly" : "monthly";
+    const periodEnd = nextStatus === "active" ? new Date() : null;
+    if (periodEnd) {
+      if (nextPlan === "yearly") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      else periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+    profileUpdates.plan = nextStatus === "active" ? nextPlan : null;
+    profileUpdates.subscription_plan = nextStatus === "active" ? nextPlan : null;
+    profileUpdates.current_period_end = periodEnd?.toISOString() ?? null;
+    profileUpdates.subscription_renews_at = periodEnd?.toISOString() ?? null;
+    profileUpdates.cancel_at_period_end = false;
   }
   if (full_name !== undefined) {
     profileUpdates.full_name = full_name;
@@ -86,26 +83,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: targetUserId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: callerProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (callerProfile?.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-  }
-
-  const adminClient = createAdminClient();
+  const context = await getAdminContext();
+  if (context.error) return context.error;
+  const { adminClient } = context;
   const [{ data: profile }, { data: scores }] = await Promise.all([
     adminClient
       .from("profiles")

@@ -1,6 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { getAdminContext } from "@/lib/admin-auth";
 import NavBar from "@/components/NavBar";
 import Link from "next/link";
+import { PLANS } from "@/lib/plans";
+import { isSubscriptionActive } from "@/lib/subscription";
 import AdminCharts, {
   DrawStatItem,
   CharityStatItem,
@@ -8,31 +10,52 @@ import AdminCharts, {
 } from "@/components/admin/AdminCharts";
 
 export default async function AdminHome() {
-  const supabase = await createClient();
+  const context = await getAdminContext();
+  if (context.error) return <main className="p-8">Admin access required.</main>;
+  const supabase = context.adminClient;
   const [
     { count: userCount },
     { data: draws },
     { data: donationData },
-    { data: profileStatuses },
+    { data: profiles },
+    { data: winners },
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase
       .from("draws")
-      .select("period, pool_total, pool_5, pool_4, pool_3, active_subscriber_count")
+      .select("id, period, pool_total, pool_5, pool_4, pool_3, active_subscriber_count")
       .eq("status", "published")
       .order("period"),
     supabase.from("donations").select("amount, charities(name)"),
-    supabase.from("profiles").select("subscription_status"),
+    supabase.from("profiles").select("subscription_status, current_period_end, cancel_at_period_end, subscription_plan, plan, charity_contribution_pct, charities(name)"),
+    supabase.from("winners").select("match_tier, amount, payment_status, draw_id"),
   ]);
 
   const totalPool = (draws ?? []).reduce((s, d) => s + Number(d.pool_total || 0), 0);
+  const paidOut = (winners ?? []).filter((winner) => winner.payment_status === "paid").reduce((s, winner) => s + Number(winner.amount || 0), 0);
+  const pendingPayout = (winners ?? []).filter((winner) => winner.payment_status !== "paid").reduce((s, winner) => s + Number(winner.amount || 0), 0);
+  const activeProfiles = (profiles ?? []).filter((profile) => isSubscriptionActive(profile));
+  const recurringCharity = new Map<string, number>();
+  for (const profile of activeProfiles) {
+    const plan = profile.subscription_plan === "yearly" || profile.plan === "yearly" ? PLANS.yearly : PLANS.monthly;
+    const name = (profile.charities as unknown as { name?: string } | null)?.name ?? "Unassigned charity";
+    recurringCharity.set(name, (recurringCharity.get(name) ?? 0) + plan.priceInr * (Number(profile.charity_contribution_pct ?? 10) / 100));
+  }
   const charityTotal = (donationData ?? []).reduce((s, d) => s + Number(d.amount || 0), 0);
+  const recurringTotal = Array.from(recurringCharity.values()).reduce((sum, amount) => sum + amount, 0);
+  const publishedDraws = draws ?? [];
+  const latestDraw = publishedDraws[publishedDraws.length - 1];
+  const latestJackpot = latestDraw ? (winners ?? []).some((winner) => winner.draw_id === latestDraw.id && winner.match_tier === 5) ? 0 : Number(latestDraw.pool_5 ?? 0) : 0;
+  const tierCounts = [5, 4, 3].map((tier) => ({ tier, count: (winners ?? []).filter((winner) => winner.match_tier === tier).length }));
 
   const stats = [
     { label: "Total users", value: userCount ?? 0 },
     { label: "Total prize pool (all draws)", value: `₹${totalPool.toLocaleString("en-IN")}` },
-    { label: "Charity totals (donations)", value: `₹${charityTotal.toLocaleString("en-IN")}` },
-    { label: "Draws published", value: (draws ?? []).length },
+    { label: "Active subscribers", value: activeProfiles.length },
+    { label: "Paid out", value: `₹${paidOut.toLocaleString("en-IN")}` },
+    { label: "Pending payouts", value: `₹${pendingPayout.toLocaleString("en-IN")}` },
+    { label: "Charity total", value: `₹${(charityTotal + recurringTotal).toLocaleString("en-IN")}` },
+    { label: "Jackpot rollover", value: `₹${latestJackpot.toLocaleString("en-IN")}` },
   ];
 
   const links = [
@@ -62,12 +85,15 @@ export default async function AdminHome() {
     const name = d.charities?.name || "General Fund";
     charityMap.set(name, (charityMap.get(name) || 0) + Number(d.amount));
   }
+  for (const [name, amount] of recurringCharity) {
+    charityMap.set(name, (charityMap.get(name) || 0) + amount);
+  }
   const charityStats: CharityStatItem[] = Array.from(charityMap.entries()).map(
     ([name, amount]) => ({ name, amount })
   );
 
   const statusMap = new Map<string, number>();
-  for (const p of profileStatuses ?? []) {
+  for (const p of profiles ?? []) {
     const s = p.subscription_status || "inactive";
     statusMap.set(s, (statusMap.get(s) || 0) + 1);
   }
@@ -106,6 +132,13 @@ export default async function AdminHome() {
           charityStats={charityStats}
           subscriberStats={subscriberStats}
         />
+
+        <div className="mb-8 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-5">
+          <h2 className="mb-3 text-sm font-semibold text-white">Winner tiers</h2>
+          <div className="flex flex-wrap gap-3 text-sm text-neutral-300">
+            {tierCounts.map(({ tier, count }) => <span key={tier} className="rounded-full bg-neutral-800 px-3 py-1">{tier}-match: {count}</span>)}
+          </div>
+        </div>
 
         <h2 className="text-lg font-bold text-white mb-4">Operations & Management</h2>
         <div className="grid md:grid-cols-2 gap-4">

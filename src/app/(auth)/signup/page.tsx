@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -10,15 +10,25 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [charities, setCharities] = useState<Array<{ id: string; name: string }>>([]);
+  const [charityId, setCharityId] = useState("");
+  const [contributionPct, setContributionPct] = useState(10);
+  const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("charities").select("id, name").order("name").then(({ data }) => setCharities(data ?? []));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
@@ -28,8 +38,17 @@ export default function SignupPage() {
       setError(error.message);
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+    if (data.session && data.user) {
+      const { error: profileError } = await supabase.from("profiles").update({ charity_id: charityId || null, charity_contribution_pct: contributionPct }).eq("id", data.user.id);
+      if (profileError) {
+        setError(profileError.message);
+        return;
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } else {
+      setSuccess("Account created. Confirm your email, then choose or review your charity from the dashboard.");
+    }
   }
 
   return (
@@ -71,7 +90,20 @@ export default function SignupPage() {
               className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-white outline-none focus:border-emerald-500"
             />
           </div>
+          <div>
+            <label className="text-sm text-neutral-300">Charity (optional)</label>
+            <select value={charityId} onChange={(e) => setCharityId(e.target.value)} className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-white outline-none focus:border-emerald-500">
+              <option value="">Choose later</option>
+              {charities.map((charity) => <option key={charity.id} value={charity.id}>{charity.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm text-neutral-300">Charity contribution: {contributionPct}%</label>
+            <input type="range" min="10" max="100" step="5" value={contributionPct} onChange={(e) => setContributionPct(Number(e.target.value))} className="mt-2 w-full accent-emerald-500" />
+            <p className="text-xs text-neutral-500">Minimum 10%; you can change this later.</p>
+          </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
+          {success && <p className="text-emerald-400 text-sm">{success}</p>}
           <button
             type="submit"
             disabled={loading}

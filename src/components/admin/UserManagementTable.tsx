@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import UserEditModal, { EditableUser } from "./UserEditModal";
+import { getSubscriptionState } from "@/lib/subscription";
 
 interface UserManagementTableProps {
   initialUsers: EditableUser[];
@@ -14,6 +15,7 @@ export default function UserManagementTable({
 }: UserManagementTableProps) {
   const [users, setUsers] = useState<EditableUser[]>(initialUsers);
   const [editingUser, setEditingUser] = useState<EditableUser | null>(null);
+  const [search, setSearch] = useState("");
 
   function handleUserSaved(updatedUser: EditableUser) {
     setUsers((prev) =>
@@ -21,10 +23,15 @@ export default function UserManagementTable({
     );
   }
 
+  const filteredUsers = users.filter((user) =>
+    `${user.full_name ?? ""} ${user.email ?? ""}`.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div>
+      <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name or email" className="mb-4 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white md:max-w-sm" />
       <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 overflow-hidden backdrop-blur-sm">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-neutral-900/90 text-neutral-400 text-left border-b border-neutral-800">
             <tr>
               <th className="px-4 py-3.5 font-medium">Name</th>
@@ -35,10 +42,11 @@ export default function UserManagementTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-800/60">
-            {users.map((u) => (
+            {filteredUsers.map((u) => (
               <tr key={u.id} className="hover:bg-neutral-800/30 transition-colors">
                 <td className="px-4 py-3.5 font-medium text-white">
                   {u.full_name || <span className="text-neutral-500 italic">Unnamed</span>}
+                  <span className="block text-[11px] text-neutral-500">{u.email}</span>
                   <span className="block text-[11px] font-mono text-neutral-500">{u.id.slice(0, 8)}...</span>
                 </td>
                 <td className="px-4 py-3.5">
@@ -55,14 +63,14 @@ export default function UserManagementTable({
                 <td className="px-4 py-3.5">
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                      u.subscription_status === "active"
+                      getSubscriptionState(u) === "active"
                         ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         : u.subscription_status === "cancelled"
                         ? "bg-red-500/15 text-red-400 border border-red-500/30"
                         : "bg-neutral-800 text-neutral-400"
                     }`}
                   >
-                    {u.subscription_status}
+                    {getSubscriptionState(u)}
                   </span>
                   {u.subscription_plan && (
                     <span className="text-xs text-neutral-500 ml-1.5 capitalize">
@@ -83,7 +91,7 @@ export default function UserManagementTable({
                 </td>
               </tr>
             ))}
-            {users.length === 0 && (
+            {filteredUsers.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
                   No users found.
@@ -91,7 +99,7 @@ export default function UserManagementTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {editingUser && (

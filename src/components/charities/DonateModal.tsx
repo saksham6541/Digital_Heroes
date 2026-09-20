@@ -45,7 +45,7 @@ export default function DonateModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(data.error || "Failed to process donation");
       }

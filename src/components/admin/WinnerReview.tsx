@@ -57,7 +57,7 @@ export default function WinnerReview({ winners: initial }: { winners: WinnerReco
       {error && (
         <div className="border-b border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300">{error}</div>
       )}
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto"><table className="w-full text-sm">
         <thead className="bg-neutral-900/60 text-neutral-400 text-left">
           <tr>
             <th className="px-4 py-3">Winner</th>
@@ -112,7 +112,7 @@ export default function WinnerReview({ winners: initial }: { winners: WinnerReco
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }
