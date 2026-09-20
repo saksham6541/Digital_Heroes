@@ -7,7 +7,7 @@ Built for the Digital Heroes selection assignment (PRD Level 1, 2026 edition).
 | | |
 |---|---|
 | **Live site** | `<LIVE_URL>` |
-| **Repository** | `<GITHUB_REPO_URL>` |
+| **Repository** | `https://github.com/saksham6541/Digital_Heroes` |
 
 ## Evaluation credentials
 
