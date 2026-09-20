@@ -20,7 +20,7 @@ These accounts are for evaluation only.
 | Subscriber | reviewer.subscriber@digitalheroes-review.com | DHreview#Sub2026! |
 | Admin | reviewer.admin@digitalheroes-review.com | DHreview#Admin2026! |
 
-Live URL: https://digital-heroes-beta-rust.vercel.app
+Live URL: https://digital-heroes-git-main-saksham-kaushik.vercel.app
 Payments are a sandbox (see [Payments](#payments)), so no card is needed. A new account can subscribe from the dashboard in two clicks.
 
 ---
